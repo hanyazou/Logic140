@@ -1,0 +1,416 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.scene.text.*?>
+<?import javafx.scene.canvas.*?>
+<?import javafx.geometry.*?>
+<?import javafx.scene.shape.*?>
+<?import java.lang.*?>
+<?import java.util.*?>
+<?import javafx.scene.*?>
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+
+<AnchorPane id="AnchorPane" fx:id="rootPane" prefHeight="600.0" prefWidth="800.0" stylesheets="@../style.css" xmlns="http://javafx.com/javafx/8" xmlns:fx="http://javafx.com/fxml/1" fx:controller="logic140.FXMLMainController">
+    <children>
+      <HBox prefHeight="40.0" style="-fx-background-color: -fx-inv-body-color;" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+         <children>
+            <HBox prefWidth="132.0">
+               <children>
+                  <TextField id="timeShiftValue" fx:id="timeValueText" onAction="#handleTimeValueTextAction" prefWidth="65.0" style="-fx-font: 9px System;" text="0" AnchorPane.topAnchor="0.0">
+                     <HBox.margin>
+                        <Insets bottom="3.0" left="8.0" top="3.0" />
+                     </HBox.margin>
+                  </TextField>
+                  <ChoiceBox id="timeShiftUnits" fx:id="timeUnitsChoice" prefWidth="55.0" style="-fx-font: 9px System;" AnchorPane.topAnchor="0.0">
+                     <HBox.margin>
+                        <Insets bottom="3.0" left="3.0" top="3.0" />
+                     </HBox.margin>
+                  </ChoiceBox>
+               </children>
+               <HBox.margin>
+                  <Insets top="8.0" />
+               </HBox.margin>
+            </HBox>
+            <ScrollBar id="timeScrollBar" fx:id="timeScrollBar" prefHeight="17.0" HBox.hgrow="ALWAYS">
+               <HBox.margin>
+                  <Insets left="5.0" right="5.0" top="12.0" />
+               </HBox.margin>
+            </ScrollBar>
+            <StackPane prefHeight="150.0" prefWidth="190.0">
+               <children>
+                  <Slider fx:id="zoomSliderTimeMode" blockIncrement="1.0" majorTickUnit="3.0" max="9.0" prefWidth="200.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
+                  <Slider fx:id="zoomSliderSampleMode" blockIncrement="1.0" majorTickUnit="3.0" max="4.0" min="-2.0" minorTickCount="2" prefWidth="200.0" showTickLabels="true" showTickMarks="true" snapToTicks="true" />
+               </children>
+               <HBox.margin>
+                  <Insets left="3.0" right="13.0" top="10.0" />
+               </HBox.margin>
+            </StackPane>
+         </children>
+      </HBox>
+      <SplitPane fx:id="mainWindowSplitPane" dividerPositions="0.7481203007518797" prefHeight="160.0" prefWidth="200.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="40.0">
+        <items>
+            <StackPane>
+               <children>
+                <AnchorPane minHeight="0.0" minWidth="0.0">
+                     <children>
+                        <VBox layoutX="62.0" layoutY="-36.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                           <children>
+                              <Separator prefWidth="200.0" />
+                              <GridPane VBox.vgrow="ALWAYS">
+                                 <columnConstraints>
+                                    <ColumnConstraints hgrow="SOMETIMES" minWidth="10.0" />
+                                 </columnConstraints>
+                                 <rowConstraints>
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                    <RowConstraints minHeight="10.0" vgrow="SOMETIMES" />
+                                 </rowConstraints>
+                                 <children>
+                                    <HBox>
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 0" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch0SpecialChoice" fx:id="ch0SpecialChoice" layoutX="-9.0" layoutY="1.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch0NameText" fx:id="ch0NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch0Handle" fx:id="ch0Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-red-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch0WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="35.0" GridPane.rowIndex="1">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 1" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch1SpecialChoice" fx:id="ch1SpecialChoice" layoutX="59.0" layoutY="1.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch1NameText" fx:id="ch1NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch1Handle" fx:id="ch1Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-orange-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch1WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="87.0" GridPane.rowIndex="2">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 2" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch2SpecialChoice" fx:id="ch2SpecialChoice" layoutX="66.0" layoutY="1.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch2NameText" fx:id="ch2NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch2Handle" fx:id="ch2Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-yellow-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch2WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="139.0" GridPane.rowIndex="3">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 3" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch3SpecialChoice" fx:id="ch3SpecialChoice" layoutX="43.0" layoutY="-6.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch3NameText" fx:id="ch3NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch3Handle" fx:id="ch3Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-green-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch3WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="191.0" GridPane.rowIndex="4">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 4" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch4SpecialChoice" fx:id="ch4SpecialChoice" layoutX="59.0" layoutY="1.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch4NameText" fx:id="ch4NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch4Handle" fx:id="ch4Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-blue-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch4WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="243.0" GridPane.rowIndex="5">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 5" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch5SpecialChoice" fx:id="ch5SpecialChoice" layoutX="52.0" layoutY="1.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch5NameText" fx:id="ch5NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch5Handle" fx:id="ch5Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-purple-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch5WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="295.0" GridPane.rowIndex="6">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 6" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch6SpecialChoice" fx:id="ch6SpecialChoice" layoutX="44.0" layoutY="-5.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch6NameText" fx:id="ch6NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch6Handle" fx:id="ch6Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, -fx-gray-color; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="7.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                                <Separator AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" />
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch6WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                    <HBox layoutX="10.0" layoutY="347.0" GridPane.rowIndex="7">
+                                       <children>
+                                          <AnchorPane>
+                                             <children>
+                                                <Label text="CH: 7" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="0.0">
+                                                   <padding>
+                                                      <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                                   </padding>
+                                                </Label>
+                                                <ChoiceBox id="ch7SpecialChoice" fx:id="ch7SpecialChoice" layoutX="41.0" layoutY="1.0" prefWidth="70.0" AnchorPane.leftAnchor="60.0" AnchorPane.topAnchor="2.0" />
+                                                <TextField id="ch7NameText" fx:id="ch7NameText" prefHeight="25.0" prefWidth="105.0" promptText="Name" AnchorPane.leftAnchor="25.0" AnchorPane.topAnchor="30.0" />
+                                                <Pane id="ch7Handle" fx:id="ch7Handle" prefWidth="20.0" style="-fx-background-color: -fx-shadow-highlight-color, -fx-outer-border, -fx-inner-border, #ffffff; -fx-background-insets: 0 0 -1 0, 0, 1, 2; -fx-background-radius: 5, 5, 4, 3;" AnchorPane.bottomAnchor="5.0" AnchorPane.leftAnchor="2.0" AnchorPane.topAnchor="2.0">
+                                                   <cursor>
+                                                      <Cursor fx:constant="MOVE" />
+                                                   </cursor>
+                                                   <opaqueInsets>
+                                                      <Insets />
+                                                   </opaqueInsets>
+                                                </Pane>
+                                             </children>
+                                             <padding>
+                                                <Insets right="2.0" />
+                                             </padding>
+                                          </AnchorPane>
+                                          <AnchorPane fx:id="ch7WavePane" onMouseExited="#handleMouseExited" onMouseMoved="#handleMouseMoved" style="-fx-background-color: black;" HBox.hgrow="ALWAYS">
+                                             <cursor>
+                                                <Cursor fx:constant="CROSSHAIR" />
+                                             </cursor>
+                                          </AnchorPane>
+                                       </children>
+                                    </HBox>
+                                 </children>
+                              </GridPane>
+                           </children>
+                        </VBox>
+                     </children>
+                  </AnchorPane>
+                  <Pane mouseTransparent="true" prefHeight="200.0" prefWidth="200.0">
+                     <children>
+                        <Line fx:id="crossHairLine" endX="100.0" smooth="false" startX="-100.0" stroke="#48bfff" visible="false" />
+                     </children>
+                  </Pane>
+               </children>
+            </StackPane>
+          <AnchorPane fx:id="functionsPane" minHeight="0.0">
+               <children>
+                  <VBox layoutX="79.0" layoutY="21.0" prefHeight="598.0" prefWidth="396.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                     <children>
+                      <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="173.0" prefWidth="200.0">
+                           <children>
+                              <Label layoutY="68.0" text="Sample time" AnchorPane.leftAnchor="10.0" AnchorPane.topAnchor="8.0">
+                                 <padding>
+                                    <Insets left="5.0" right="5.0" top="5.0" />
+                                 </padding>
+                              </Label>
+                              <ChoiceBox id="freqSelect" fx:id="freqChoice" layoutX="60.0" layoutY="64.0" prefWidth="70.0" AnchorPane.leftAnchor="85.0" AnchorPane.topAnchor="8.0" />
+                              <CheckBox fx:id="trimDataCheckBox" layoutX="12.0" layoutY="66.0" mnemonicParsing="false" text="Trim leading and trailing data" AnchorPane.topAnchor="43.0" />
+                              <ToggleButton id="goButton" fx:id="goButton" layoutX="23.0" layoutY="185.0" mnemonicParsing="false" onAction="#handleGoButtonAction" prefWidth="150.0" text="Go" AnchorPane.topAnchor="70.0">
+                                 <opaqueInsets>
+                                    <Insets />
+                                 </opaqueInsets>
+                              </ToggleButton>
+                              <AnchorPane prefHeight="200.0" prefWidth="200.0" style="-fx-background-color: -fx-inv-body-color;" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="2.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="110.0">
+                                 <children>
+                                    <Label fx:id="capturedInfoLabel" alignment="CENTER" text="no data captured" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="8.0" />
+                                    <Label fx:id="cursorInfoLabel" alignment="CENTER" prefHeight="17.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="35.0" />
+                                 </children>
+                              </AnchorPane>
+                           </children>
+                        </AnchorPane>
+                        <TitledPane animated="false" expanded="false" text="SPI" VBox.vgrow="ALWAYS">
+                          <content>
+                            <AnchorPane maxHeight="1.7976931348623157E308">
+                                 <children>
+                                    <TableView fx:id="spiTable" minWidth="-Infinity" prefWidth="200.0" AnchorPane.bottomAnchor="-10.0" AnchorPane.leftAnchor="-10.0" AnchorPane.rightAnchor="-10.0" AnchorPane.topAnchor="-10.0">
+                                      <columns>
+                                        <TableColumn id="spiTimeColumn" fx:id="spiTimeColumn" editable="false" maxWidth="75.0" minWidth="75.0" prefWidth="75.0" resizable="false" sortable="false" text="Time" />
+                                          <TableColumn fx:id="spiSsColumn" editable="false" maxWidth="30.0" minWidth="30.0" prefWidth="30.0" resizable="false" sortable="false" text="!SS" />
+                                        <TableColumn id="spiMosiColumn" fx:id="spiMosiColumn" editable="false" maxWidth="40.0" minWidth="40.0" prefWidth="40.0" resizable="false" sortable="false" text="MOSI" />
+                                          <TableColumn id="spiMisoColumn" fx:id="spiMisoColumn" editable="false" maxWidth="40.0" minWidth="40.0" prefWidth="40.0" resizable="false" sortable="false" text="MISO" />
+                                      </columns>
+                                       <columnResizePolicy>
+                                          <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                       </columnResizePolicy>
+                                    </TableView>
+                                 </children>
+                              </AnchorPane>
+                          </content>
+                        </TitledPane>
+                        <TitledPane animated="false" expanded="false" text="I2C" VBox.vgrow="SOMETIMES">
+                          <content>
+                            <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0" />
+                          </content>
+                        </TitledPane>
+                        <TitledPane animated="false" maxHeight="1.7976931348623157E308" prefHeight="1000.0" text="log">
+                          <content>
+                            <AnchorPane minHeight="0.0" minWidth="0.0" prefHeight="180.0" prefWidth="200.0">
+                                 <children>
+                                    <TableView fx:id="logTable" layoutX="-37.0" layoutY="-77.0" maxHeight="1.7976931348623157E308" prefHeight="1000.0" AnchorPane.bottomAnchor="-10.0" AnchorPane.leftAnchor="-10.0" AnchorPane.rightAnchor="-10.0" AnchorPane.topAnchor="-10.0">
+                                      <columns>
+                                        <TableColumn fx:id="logTimeColumn" editable="false" maxWidth="600.0" prefWidth="60.0" sortable="false" text="time" />
+                                        <TableColumn fx:id="logEventColumn" editable="false" maxWidth="1380.0" prefWidth="138.0" sortable="false" text="event" />
+                                      </columns>
+                                       <columnResizePolicy>
+                                          <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                                       </columnResizePolicy>
+                                    </TableView>
+                                 </children>
+                              </AnchorPane>
+                          </content>
+                        </TitledPane>
+                     </children>
+                  </VBox>
+               </children>
+            </AnchorPane>
+        </items>
+      </SplitPane>
+    </children>
+</AnchorPane>
