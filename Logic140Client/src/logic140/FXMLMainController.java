@@ -25,6 +25,7 @@
  */
 package logic140;
 
+import java.io.File;
 import java.net.URL;
 import java.util.ResourceBundle;
 import java.util.logging.Level;
@@ -38,6 +39,7 @@ import javafx.fxml.FXML;
 import javafx.geometry.Point2D;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Button;
 import javafx.scene.control.CheckBox;
 import javafx.scene.control.ChoiceBox;
 import javafx.scene.control.Label;
@@ -57,6 +59,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Line;
 import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.transform.Transform;
+import javafx.stage.FileChooser;
+import javafx.stage.FileChooserBuilder;
 import javafx.stage.Stage;
 import javafx.util.StringConverter;
 
@@ -231,6 +235,12 @@ public class FXMLMainController {
     private CheckBox trimDataCheckBox;
     
     @FXML
+    private Button saveButton;
+    
+    @FXML
+    private Button loadButton;
+    
+    @FXML
     void handleTimeValueTextAction(ActionEvent event) {
         try {
             double value = Double.parseDouble(timeValueText.getText().replace(',', '.'));
@@ -275,6 +285,16 @@ public class FXMLMainController {
 //        redrawWaves();
     }
 
+    @FXML
+    void handleSaveButtonAction(ActionEvent event) {
+        Main.saveData();
+    }
+
+    @FXML
+    void handleLoadButtonAction(ActionEvent event) {
+        Main.loadData();
+    }
+    
     @FXML
     void initialize() {
         assert ch3Handle != null : "fx:id=\"ch3Handle\" was not injected: check your FXML file 'FXMLMain.fxml'.";
@@ -337,7 +357,7 @@ public class FXMLMainController {
     private double zoomFactor;
     private double[] wavesX;
     private final double[][] wavesY = new double[8][];
-    private final Main.DataIterator dataIterator = new Main.DataIterator();
+    private final Data.DataIterator dataIterator = new Data.DataIterator();
     private int waveZoomChangePivotSample = -1;
     private int waveZoomChangePivotX = 0;
     
@@ -615,11 +635,21 @@ public class FXMLMainController {
 
     void setStoppedState() {
         goButton.setSelected(false);
-        goButton.setText("Go");
+        goButton.setText("_Go");
         capturedInfoLabel.setText(capturedInfoLabel.getText()+
-                String.format(" (%d%% in)", (int)Main.percentCaptured));
+                String.format(" (%d%% in)", (int)Data.percentCaptured));
+        loadButton.setDisable(false);
     }
 
+    void dataLoaded(int totalNumSamples) {
+        capturedInfoLabel.setText("last capture at "+Data.getFrequency().getText());
+
+        if (zoomSliderTimeMode.isVisible())
+            updateZoomFactorTimeMode((int) zoomSliderTimeMode.getValue());
+
+        updateWaves(totalNumSamples, totalNumSamples);
+    }
+    
     void updateWaves(int totalNumSamples, int newPos) {
         final double numSamplePixels = totalNumSamples/zoomFactor;
         final double max = Math.max(0, numSamplePixels-waveWindowWidth);
@@ -652,7 +682,9 @@ public class FXMLMainController {
     }
     
     private void startImpl() {
-        goButton.setText("Running, click to Stop");
+        goButton.setText("Running, click to S_top");
+        loadButton.setDisable(true);
+        saveButton.setDisable(false);
         capturedInfoLabel.setText("last capture at "+freqChoice.getSelectionModel().getSelectedItem());
         LogicAnalyzer.Frequency frequency =
             LogicAnalyzer.Frequency.values()[freqChoice.getSelectionModel().getSelectedIndex()];
@@ -677,12 +709,12 @@ public class FXMLMainController {
         waveWindowPosition = (int) timeScrollBar.getValue();
         final int firstSampleIndex = (int) (waveWindowPosition * zoomFactor);
         final int windowHeight = (int) ch0WavePane.getBoundsInLocal().getHeight();
-        final int totalSamples = Main.totalNumSamples;
+        final int totalSamples = Data.totalNumSamples;
         final int y0 = windowHeight / 8;
         final int y1 = windowHeight - y0;
         if (totalSamples <= 0)
             return;
-        Main.DataIterator d = dataIterator;
+        Data.DataIterator d = dataIterator;
         if (d.init(firstSampleIndex)) {
             double x = 0;
             int xCur = 0;
@@ -821,7 +853,7 @@ public class FXMLMainController {
             for (int i = 0; i < 8; i++)
                 wavesY[i] = new double[waveWindowWidth*3]; // max 3 points per sample or x coordinate
         }
-        updateWaves(Main.totalNumSamples, (int) (waveZoomChangePivotSample-waveZoomChangePivotX*zoomFactor));
+        updateWaves(Data.totalNumSamples, (int) (waveZoomChangePivotSample-waveZoomChangePivotX*zoomFactor));
     }
     
     private void updateMouseInfo(int localX, int sceneX) {

@@ -343,21 +343,23 @@
                <children>
                   <VBox layoutX="79.0" layoutY="21.0" prefHeight="598.0" prefWidth="396.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
                      <children>
-                      <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="173.0" prefWidth="200.0">
+                      <AnchorPane maxHeight="-Infinity" maxWidth="-Infinity" minHeight="-Infinity" minWidth="-Infinity" prefHeight="200.0" prefWidth="200.0">
                            <children>
-                              <Label layoutY="68.0" text="Sample time" AnchorPane.leftAnchor="10.0" AnchorPane.topAnchor="8.0">
+                              <Label layoutY="68.0" text="Sample time" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="8.0">
                                  <padding>
                                     <Insets left="5.0" right="5.0" top="5.0" />
                                  </padding>
                               </Label>
-                              <ChoiceBox id="freqSelect" fx:id="freqChoice" layoutX="60.0" layoutY="64.0" prefWidth="70.0" AnchorPane.leftAnchor="85.0" AnchorPane.topAnchor="8.0" />
+                              <ChoiceBox id="freqSelect" fx:id="freqChoice" layoutX="60.0" layoutY="64.0" prefWidth="70.0" AnchorPane.leftAnchor="100.0" AnchorPane.topAnchor="8.0" />
                               <CheckBox fx:id="trimDataCheckBox" layoutX="12.0" layoutY="66.0" mnemonicParsing="false" text="Trim leading and trailing data" AnchorPane.topAnchor="43.0" />
-                              <ToggleButton id="goButton" fx:id="goButton" layoutX="23.0" layoutY="185.0" mnemonicParsing="false" onAction="#handleGoButtonAction" prefWidth="150.0" text="Go" AnchorPane.topAnchor="70.0">
+                              <ToggleButton id="goButton" fx:id="goButton" layoutX="23.0" layoutY="185.0" onAction="#handleGoButtonAction" text="_Go" AnchorPane.leftAnchor="20.0" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="70.0">
                                  <opaqueInsets>
                                     <Insets />
                                  </opaqueInsets>
                               </ToggleButton>
-                              <AnchorPane prefHeight="200.0" prefWidth="200.0" style="-fx-background-color: -fx-inv-body-color;" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="2.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="110.0">
+                              <Button fx:id="saveButton" disable="true" layoutX="22.0" layoutY="100.0" onAction="#handleSaveButtonAction" text="_Save" AnchorPane.leftAnchor="20.0" AnchorPane.topAnchor="103.0" />
+                              <Button fx:id="loadButton" layoutX="120.0" layoutY="100.0" onAction="#handleLoadButtonAction" text="_Load" AnchorPane.rightAnchor="20.0" AnchorPane.topAnchor="103.0" />
+                              <AnchorPane style="-fx-background-color: -fx-inv-body-color;" AnchorPane.leftAnchor="2.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="140.0">
                                  <children>
                                     <Label fx:id="capturedInfoLabel" alignment="CENTER" text="no data captured" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="8.0" />
                                     <Label fx:id="cursorInfoLabel" alignment="CENTER" prefHeight="17.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="35.0" />

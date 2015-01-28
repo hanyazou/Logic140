@@ -25,10 +25,9 @@
  */
 package logic140;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
+import java.io.File;
+import java.io.IOException;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -45,10 +44,12 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
+import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
+import static logic140.Data.percentCaptured;
 
 /**
  *
@@ -62,148 +63,19 @@ public class Main extends Application {
     static final Object acquisitionLock = new Object();
     static volatile boolean finish;
     static volatile boolean go;
-    static int totalNumSamples;
     static LogicAnalyzer.Frequency frequency;
     private static boolean enableSPI;
     private static int mosi;
     private static int miso;
     private static int sclk;
-    private static final List<Packet> data = new ArrayList<>();
     static final ObservableList<Event> events = FXCollections.observableList(new LinkedList<Event>());
     private static long startTime;
     private static long lastSampleTime;
-    static double percentCaptured;
-    private static int totalNumDataSamples;
-    private static boolean trim;
-    private static boolean lead;
+    static boolean trim;
+    static Stage mainStage;
+    private static FileChooser openFileChooser;
+    private static FileChooser saveFileChooser;
     
-    static class Packet {
-        final byte[] buf;
-        final int trailingGapLength;
-        final byte min;
-        final byte max;
-        
-        private Packet(byte[] buf, int trailingGapLength, byte min, byte max) {
-            this.buf = buf;
-            this.trailingGapLength = trailingGapLength;
-            this.min = min;
-            this.max = max;
-        }
-    }
-    
-    static class DataIterator {
-        Packet packet;
-        int index;
-        int sample;
-        
-        DataIterator() {
-        }
-
-        /**
-         * Initializes the iterator to start with the provided sample
-         * @param startSample
-         * @return true if there is any data after requested sample, false
-         * if the requested sample is exactly the next sample after the last
-         * (or startSample is 0 and there is no data at all)
-         */
-        boolean init(int startSample) {
-            if (startSample > totalNumSamples)
-                throw new IndexOutOfBoundsException();
-            index = 0;
-            packet = null;
-            while (index < data.size()) {
-                packet = data.get(index);
-                int packetLength = packet.buf.length + packet.trailingGapLength;
-                if (startSample < packetLength) {
-                    sample = startSample;
-                    break;
-                }
-                startSample -= packetLength;
-                if (++index == data.size()) {
-                    if (startSample == 0)
-                        return false;
-                    else
-                        throw new RuntimeException();
-                }
-            }
-            return true;
-        }
-        
-        boolean atLostData() {
-            return sample >= packet.buf.length;
-        }
-        
-        int getRemainingDataLength() {
-            return packet.buf.length - sample;
-        }
-        
-        int getRemainingLostLength() {
-            return packet.buf.length + packet.trailingGapLength - sample;
-        }
-        
-        int getLostDataLength() {
-            return packet.trailingGapLength;
-        }
-        
-        byte[] getData() {
-            if (atLostData())
-                throw new IllegalStateException();
-            return packet.buf;
-        }
-        
-        int getDataStart() {
-            if (atLostData())
-                throw new IllegalStateException();
-            return sample;
-        }
-        
-        boolean hasMoreData() {
-            synchronized (data) {
-                return packet != null && (index < data.size() || sample < packet.buf.length + packet.trailingGapLength);
-            }
-        }
-        
-        private void loadNextPacket() {
-            synchronized (data) {
-                packet = index < data.size()-1 ? data.get(++index) : null;
-                sample = 0;
-            }
-        }
-        
-        byte getPacketMin() {
-            return packet.min;
-        }
-        
-        byte getPacketMax() {
-            return packet.max;
-        }
-        
-        void skip(int samples) {
-            sample += samples;
-            if (sample >= packet.buf.length + packet.trailingGapLength) {
-                if (sample > packet.buf.length + packet.trailingGapLength)
-                    throw new UnsupportedOperationException();
-                loadNextPacket();
-            }
-        }
-        
-        void skipData() {
-            if (sample <= packet.buf.length) {
-                if (packet.trailingGapLength > 0)
-                    sample = packet.buf.length;
-                else 
-                    loadNextPacket();
-            } else
-                throw new IllegalStateException();
-        }
-        
-        void skipLostData() {
-            if (sample < packet.buf.length || packet.trailingGapLength == 0)
-                throw new IllegalStateException();
-            loadNextPacket();
-        }
-    }
-
     @Override
     public void start(final Stage stage) throws Exception {
         logger.addHandler(new FileHandler("error.log"));
@@ -217,7 +89,19 @@ public class Main extends Application {
         
         stage.setOnCloseRequest((WindowEvent event) -> finish());
         stage.setOnShown((WindowEvent event) -> controller.postInitControls(stage));
+        stage.setTitle("LA140");
         stage.show();
+        mainStage = stage;
+
+        openFileChooser = new FileChooser();
+        openFileChooser.setTitle("Choose the data file");
+        openFileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Data file", "*.la140"));
+        openFileChooser.setInitialDirectory(new File(Main.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile());
+        
+        saveFileChooser = new FileChooser();
+        saveFileChooser.setTitle("Choose the data file");
+        saveFileChooser.getExtensionFilters().addAll(new FileChooser.ExtensionFilter("Data file", "*.la140"));
+        saveFileChooser.setInitialDirectory(new File(Main.class.getProtectionDomain().getCodeSource().getLocation().getPath()).getParentFile());
         
         FXReScheduler.runAsync(() -> {
             try {
@@ -306,8 +190,11 @@ public class Main extends Application {
     
     static void error(Exception ex, boolean isCritical) {
         logger.log(Level.SEVERE, ex.getMessage(), ex);
-        
-        Label errorMessageLabel = new Label(ex.getMessage());
+        error(ex.getMessage(), isCritical);
+    }
+    
+    static void error(String text, boolean isCritical) {
+        Label errorMessageLabel = new Label(text);
         Button errorDismissButton = new Button("Dismiss");
         errorDismissButton.setDefaultButton(true);
         VBox errorPane = new VBox();
@@ -352,13 +239,11 @@ public class Main extends Application {
     static void startAcquisition(LogicAnalyzer.Frequency frequency) {
         if (go || la == null)
             return;
+        mainStage.setTitle("LA140 - acquired data");
         Main.frequency = frequency;
-        totalNumSamples = 0;
-        totalNumDataSamples = 0;
-        data.clear();
+        Data.startAcquisition(frequency);
         events.clear();
         startTime = System.nanoTime();
-        lead = true;
         synchronized (acquisitionLock) {
             go = true;
             acquisitionLock.notify();
@@ -372,22 +257,9 @@ public class Main extends Application {
         synchronized (acquisitionLock) {
             la.stop();
         }
-        percentCaptured = totalNumDataSamples * 1e11 / 
+        percentCaptured = Data.totalNumDataSamples * 1e11 / 
                 (frequency.getFrequency()*(lastSampleTime-startTime));
-        if (trim) {
-            for (int i = data.size(); --i >= 1; ) {
-                Packet p = data.get(i);
-                synchronized (data) {
-                    if (p.min == p.max)
-                        data.remove(i);
-                    else
-                        break;
-                    totalNumSamples -= p.buf.length + p.trailingGapLength;
-                    totalNumDataSamples -= p.buf.length;
-                }
-                controller.updateWaves(totalNumSamples, totalNumSamples);
-            }
-        }
+        Data.stopAcquisition(trim);
     }
     
     private static void reset() {
@@ -397,27 +269,7 @@ public class Main extends Application {
     
     private static void processData(LogicAnalyzer.Packet packet) {
         lastSampleTime = System.nanoTime();
-        ByteBuffer buf = packet.getBuffer();
-        final int packetTrailingGap = packet.getTrailingGapLength();
-        byte[] d = new byte[LogicAnalyzer.SAMPLES_PER_BUFFER];
-        byte min = (byte)0xff;
-        byte max = 0;
-        for (int i = LogicAnalyzer.SAMPLES_PER_BUFFER; --i >= 0; ) {
-            byte val = buf.get((i<<1)+1);
-            min &= val;
-            max |= val;
-            d[i] = val;
-        }
-        la.releaseDataBuffer(packet);
-        if (!lead || !trim || min != max) {
-            synchronized (data) {
-                data.add(new Packet(d, packetTrailingGap, min, max));
-                totalNumSamples += buf.capacity() / 2 + packetTrailingGap;
-                totalNumDataSamples += buf.capacity() / 2;
-            }
-            lead = false;
-            Platform.runLater(() -> controller.updateWaves(totalNumSamples, totalNumSamples));
-        }
+        Data.processData(packet);
     }
 
     static String sampleToTime(int pos, int unitsId) {
@@ -437,5 +289,31 @@ public class Main extends Application {
             return value * frequency.getFrequency() / Math.pow(1000, 4-unitsId);
         else
             return value;
+    }
+    
+    static void loadData() {
+        File dataFile = openFileChooser.showOpenDialog(mainStage);
+        if (dataFile != null) {
+            mainStage.setTitle("LA140 - " + dataFile.getName());
+            try {
+                Data.load(dataFile);
+                frequency = Data.getFrequency();
+            } catch (IOException ex) {
+                error(ex, false);
+            }
+        }
+    }
+    
+    static void saveData() {
+        File dataFile = saveFileChooser.showSaveDialog(mainStage);
+        if (dataFile != null) {
+            mainStage.setTitle("LA140 - " + dataFile.getName());
+            try {
+                Data.save(dataFile);
+            }
+            catch (IOException ex) {
+                error(ex, false);
+            }
+        }
     }
 }
