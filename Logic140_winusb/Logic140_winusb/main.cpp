@@ -189,7 +189,7 @@ JNIEXPORT jint JNICALL Java_libUsb_UsbDevice_fillBuffer0
 	(void)descriptor;
 	num++;
 	for (int i = (ULONG)env->GetDirectBufferCapacity(buf); --i >= 0; )
-		p[i] = num != 3 && num != 5 ? 1 : (UCHAR)(0x155 >> ((i >> 8) & 1));
+		p[i] = num != 3 && num != 5 ? 1 : (UCHAR)(0x155 >> (((i + ((i & 1)*10)) >> 8) & 1));
 	Sleep(100);
 	return (jint)env->GetDirectBufferCapacity(buf);
 #endif
