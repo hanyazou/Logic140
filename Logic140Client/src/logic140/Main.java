@@ -49,32 +49,33 @@ import javafx.stage.Modality;
 import javafx.stage.Stage;
 import javafx.stage.StageStyle;
 import javafx.stage.WindowEvent;
-import static logic140.Data.percentCaptured;
 
 /**
  *
- * @author Dragon
+ * @author Andrey Petushkov
  */
 public class Main extends Application {
-    static FXMLMainController controller;
-    static LogicAnalyzer la;
+    static MainController controller;
+    static DDS140 device;
     static final Logger logger = Logger.getLogger("Logic140");
     static Thread acquisitionThread;
     static final Object acquisitionLock = new Object();
     static volatile boolean finish;
     static volatile boolean go;
-    static LogicAnalyzer.Frequency frequency;
     private static boolean enableSPI;
-    private static int mosi;
-    private static int miso;
-    private static int sclk;
-    static final ObservableList<Event> events = FXCollections.observableList(new LinkedList<Event>());
     private static long startTime;
     private static long lastSampleTime;
-    static boolean trim;
     static Stage mainStage;
     private static FileChooser openFileChooser;
     private static FileChooser saveFileChooser;
+    private static boolean isCaptureLogicAnalyzerMode;
+    static Data oData = new Data();
+    static Data laData = new Data();
+    static final ObservableList<Event> laEvents = FXCollections.observableList(new LinkedList<Event>());
+    static final ObservableList<Event> oEvents = FXCollections.observableList(new LinkedList<Event>());
+    private static Data captureData;
+    private static DDS140.Voltage ch1Voltage;
+    private static DDS140.Voltage ch2Voltage;
     
     @Override
     public void start(final Stage stage) throws Exception {
@@ -105,8 +106,8 @@ public class Main extends Application {
         
         FXReScheduler.runAsync(() -> {
             try {
-                la = new LogicAnalyzer();
-                la.init();
+                device = new DDS140();
+                device.init();
 
                 acquisitionThread = new Thread(() -> {
                     while (!finish) {
@@ -119,10 +120,12 @@ public class Main extends Application {
                         }
                         if (go) {
                             try {
-                                la.setFrequency(frequency);
-                                la.go();
+                                device.setFrequency(captureData.getFrequency());
+                                device.setVoltage(ch1Voltage, ch2Voltage);
+                                device.setIsLogicAnalyzer(isCaptureLogicAnalyzerMode);
+                                device.go();
                                 while (go) {
-                                    LogicAnalyzer.Packet data1 = la.getData();
+                                    DDS140.Packet data1 = device.getData();
                                     if (data1 == null) {
                                         if (go)
                                             throw new NullPointerException("null data");
@@ -144,7 +147,9 @@ public class Main extends Application {
             }
             catch (Exception ex) {
                 FXReScheduler.runOnFXThread(() -> {
-                    error(ex, true);
+                    device = null;
+                    controller.disableGo();
+                    error(ex, false);
                 });
             }
         });
@@ -173,8 +178,8 @@ public class Main extends Application {
 
             controller.savePreferences();
             
-            if (la != null)
-                la.finish();
+            if (device != null)
+                device.finish();
             if (acquisitionThread != null) {
                 synchronized (acquisitionLock) {
                     acquisitionLock.notify();
@@ -225,25 +230,48 @@ public class Main extends Application {
         s.showAndWait();
     }
     
-    static void enableSPI(int mosi, int miso, int sclk) {
+    static void enableSPI(int mosi, int miso, int sclk, int ss, int mode) {
         enableSPI = true;
-        Main.mosi = mosi;
-        Main.miso = miso;
-        Main.sclk = sclk;
-    }
-    
-    static void setTrim(boolean trim) {
-        Main.trim = trim;
+        SPI.setData(laData);
+        SPI.init(sclk, mosi, miso, ss, (mode & 2) != 0, (mode & 1) != 0);
+        parseSpi();
     }
 
-    static void startAcquisition(LogicAnalyzer.Frequency frequency) {
-        if (go || la == null)
+    private static void parseSpi() {
+        if (enableSPI && laData.totalNumDataSamples > 0)
+            SPI.parse(new SPI.SPIEventHandler() {
+
+            @Override
+            public void spiError(int sample, String msg) {
+                System.out.println("SPI parse error at "+sample+" "+msg);
+            }
+
+            @Override
+            public void spiData(int sample, int mosi, int miso, int ss) {
+            }
+        });
+    }
+    
+    static void disableSPI() {
+        enableSPI = false;
+        SPI.deinit();
+    }
+    
+    static void setVoltage(DDS140.Voltage ch1Voltage, DDS140.Voltage ch2Voltage) {
+        Main.ch1Voltage = ch1Voltage;
+        Main.ch2Voltage = ch2Voltage;
+    }
+    
+    static void startAcquisition(DDS140.Frequency frequency, boolean isLogicAnalyzerMode, boolean trim) {
+        if (go || device == null)
             return;
         mainStage.setTitle("LA140 - acquired data");
-        Main.frequency = frequency;
-        Data.startAcquisition(frequency);
-        events.clear();
+        Main.isCaptureLogicAnalyzerMode = isLogicAnalyzerMode;
+        captureData = isLogicAnalyzerMode ? laData : oData;
+        captureData.startAcquisition(frequency, isLogicAnalyzerMode, trim);
+        (isLogicAnalyzerMode ? laEvents : oEvents).clear();
         startTime = System.nanoTime();
+        SPI.reset();
         synchronized (acquisitionLock) {
             go = true;
             acquisitionLock.notify();
@@ -251,15 +279,20 @@ public class Main extends Application {
     }
 
     static void stopAcquisition() {
-        if (!go || la == null)
+        if (!go || device == null)
             return;
         reset();
         synchronized (acquisitionLock) {
-            la.stop();
+            device.stop();
         }
-        percentCaptured = Data.totalNumDataSamples * 1e11 / 
-                (frequency.getFrequency()*(lastSampleTime-startTime));
-        Data.stopAcquisition(trim);
+        captureData.percentCaptured = captureData.totalNumDataSamples * 1e11 / 
+                (captureData.getFrequency().getFrequency()*(lastSampleTime-startTime));
+        captureData.stopAcquisition();
+        captureData = null;
+    }
+
+    static void addEvent(Event event) {
+        (isCaptureLogicAnalyzerMode ? laEvents : oEvents).add(event);
     }
     
     private static void reset() {
@@ -267,49 +300,42 @@ public class Main extends Application {
         enableSPI = false;
     }
     
-    private static void processData(LogicAnalyzer.Packet packet) {
+    private static void processData(DDS140.Packet packet) {
+        if (packet == null)
+            return;
         lastSampleTime = System.nanoTime();
-        Data.processData(packet);
+        captureData.processData(packet);
+        parseSpi();
     }
 
-    static String sampleToTime(int pos, int unitsId) {
-        if (frequency == null)
-            return "";
-        if (unitsId > 0) {
-            double time = pos * Math.pow(1000, 4-unitsId) / frequency.getFrequency();
-            return String.format("%.2f", time);
-        } else
-            return String.valueOf(pos);
-    }
-
-    static double timeToSamples(double value, int unitsId) {
-        if (frequency == null)
-            return 0.;
-        if (unitsId > 0)
-            return value * frequency.getFrequency() / Math.pow(1000, 4-unitsId);
-        else
-            return value;
-    }
-    
     static void loadData() {
         File dataFile = openFileChooser.showOpenDialog(mainStage);
         if (dataFile != null) {
             mainStage.setTitle("LA140 - " + dataFile.getName());
             try {
-                Data.load(dataFile);
-                frequency = Data.getFrequency();
+                SPI.reset();
+                Data data = Data.load(dataFile);
+                if (data.isLogicAnalyzerMode) {
+                    laData = data;
+                    if (enableSPI)
+                        SPI.setData(laData);
+                    parseSpi();
+                } else {
+                    oData = data;
+                }
+                controller.dataLoaded(data.isLogicAnalyzerMode);
             } catch (IOException ex) {
                 error(ex, false);
             }
         }
     }
     
-    static void saveData() {
+    static void saveData(Data data) {
         File dataFile = saveFileChooser.showSaveDialog(mainStage);
         if (dataFile != null) {
             mainStage.setTitle("LA140 - " + dataFile.getName());
             try {
-                Data.save(dataFile);
+                data.save(dataFile);
             }
             catch (IOException ex) {
                 error(ex, false);

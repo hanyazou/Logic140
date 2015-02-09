@@ -35,7 +35,7 @@ import java.util.logging.Logger;
 
 /**
  *
- * @author Dragon
+ * @author Andrey Petushkov
  */
 public class UsbDeviceFactory {
     private static boolean init;

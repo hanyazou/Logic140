@@ -34,9 +34,9 @@ import libUsb.UsbDeviceFactory;
 
 /**
  *
- * @author Dragon
+ * @author Andrey Petushkov
  */
-class LogicAnalyzer implements Runnable {
+class DDS140 implements Runnable {
     private static final int BUFFER_SIZE = 0x20000;
     private static final int MAX_MEMORY = 10*1024*1024; // TODO base on configured heap maximum
     static int SAMPLES_PER_BUFFER = BUFFER_SIZE / 2;
@@ -49,6 +49,9 @@ class LogicAnalyzer implements Runnable {
     private final List<Packet> freePool = new LinkedList<>();
     private final List<Packet> busyPool = new LinkedList<>();
     private Frequency curFrequency = Frequency.F_10M;
+    private boolean isLogicAnalyzerMode;
+    private Voltage ch1Voltage;
+    private Voltage ch2Voltage;
 
     private enum State {
         INIT,
@@ -97,7 +100,7 @@ class LogicAnalyzer implements Runnable {
             return freq;
         }
         
-        public byte getCode() {
+        private byte getCode() {
             return val;
         }
         
@@ -105,13 +108,51 @@ class LogicAnalyzer implements Runnable {
             return text;
         }
     }
+
+    enum Voltage {
+//22,08 50mV
+//22,04 100mV
+//22,00 200mV
+//22,06 500mV
+//22,02 1V
+//22,02 2V
+//22,02 5V
+//
+//CH2 Voltage setting:
+//23,20 50mV
+//23,10 100mV
+//23,00 200mV
+//23,12 500mV
+//23,02 1V
+//23,02 2V
+//23,02 5V        
+        
+        V_50m(0x08, 0x20, 50, "50mV"),
+        V_100m(0x04, 0x10, 100, "100mV"),
+        V_200m(0x00, 0x00, 200, "200mV"),
+        V_500m(0x02, 0x12, 500, "500mV"),
+        V_1(0x02, 0x02, 1000, "1V"),
+        V_2(0x02, 0x02, 2000, "2V"),
+        V_5(0x02, 0x02, 5000, "5V");
+        
+        private final int ch1val;
+        private final int ch2val;
+        private final String name;
+        private final int ref;
+        
+        Voltage(int ch1val, int ch2val, int ref, String name) {
+            this.ch1val = ch1val;
+            this.ch2val = ch2val;
+            this.name = name;
+            this.ref = ref;
+        }
+        
+        public String getName() {
+            return name;
+        }
+    }
     
-    // TODO
-    // - save and restore setup
-    // - save and restore captured data
-    // - SPI analyzer
-    
-    public LogicAnalyzer() {
+    public DDS140() {
         usb = UsbDeviceFactory.createInstance(0xDC5D4E19_D8E4_4BE9L, 0x9D_CD_71_A0_5D_36_FA_CDL);
         dataThread = new Thread(this, "LogicAnalyzer");
         dataThread.setPriority(7);
@@ -158,6 +199,10 @@ class LogicAnalyzer implements Runnable {
             throw new IOException("DD140 init failed");
         state = State.INIT;
         dataThread.start();
+    }
+
+    void setIsLogicAnalyzer(boolean isLogicAnalyzerMode) {
+        this.isLogicAnalyzerMode = isLogicAnalyzerMode;
     }
     
     public void go() throws IOException {
@@ -231,6 +276,15 @@ class LogicAnalyzer implements Runnable {
         curFrequency = frequency;
     }
     
+    void setVoltage(Voltage ch1, Voltage ch2) throws IOException {
+        ch1Voltage = ch1;
+        ch2Voltage = ch2;
+        if (usb.controlRequest((byte) 0x22, (byte) ch1Voltage.ch1val) != (byte) ch1Voltage.ch1val)
+            throw new IOException("DDS140 set ch1 voltage failed");
+        if (usb.controlRequest((byte) 0x23, (byte) ch2Voltage.ch2val) != (byte) ch2Voltage.ch2val)
+            throw new IOException("DDS140 set ch2 voltage failed");
+    }
+    
     @Override
     public void run() {
         try {
@@ -246,7 +300,7 @@ class LogicAnalyzer implements Runnable {
                             lock.notifyAll();
                         }
 
-                        if (usb.controlRequest((byte) 0x34, (byte) 0x01) != (byte) 0x34) // 
+                        if (usb.controlRequest((byte) 0x34, isLogicAnalyzerMode ? (byte) 0x01 : (byte) 0x00) != (byte) 0x34) // 
                             throw new IOException("DD140 go failed");
                         if (usb.controlRequest((byte) 0x35, (byte) 0x00) != (byte) 0x35) // 
                             throw new IOException("DD140 go failed");
@@ -280,8 +334,8 @@ class LogicAnalyzer implements Runnable {
                                 firstPacket = false;
                                 releaseDataBuffer(packet);
                             } else {
-                                Main.events.add(new Event(dataReadyTime-startTime, "data ready"));
-                                Main.events.add(new Event(dataInTime-startTime, 
+                                Main.addEvent(new Event(dataReadyTime-startTime, "data ready"));
+                                Main.addEvent(new Event(dataInTime-startTime, 
                                         String.format("%d%% in/%d%% lost", 
                                                 (int)(65536e11/(dataInTime-dataStartTime))/curFrequency.getFrequency(),
                                                 (int)((dataInTime-dataReadyTime)*100./(dataInTime-dataStartTime)))));

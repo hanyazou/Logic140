@@ -39,35 +39,51 @@ import javafx.application.Platform;
 
 /**
  *
- * @author Dragon
+ * @author Andrey Petushkov
  */
 public class Data {
-    private static final List<Packet> data = new ArrayList<>();
-    private static boolean lead;
-    private static LogicAnalyzer.Frequency frequency;
+    private final List<Packet> data = new ArrayList<>();
+    private boolean lead;
+    private DDS140.Frequency frequency;
+    private boolean trim;
 
-    static double percentCaptured;
-    static int totalNumDataSamples;
-    static int totalNumSamples;
+    double percentCaptured;
+    volatile int totalNumDataSamples;
+    volatile int totalNumSamples;
+    boolean isLogicAnalyzerMode;
 
-    static class Packet {
-        final byte[] buf;
+    class Packet {
+        final byte[] buf1;
+        final byte[] buf2;
         final int trailingGapLength;
         final byte min;
         final byte max;
+        final byte minCh1;
+        final byte maxCh1;
+        final byte minCh2;
+        final byte maxCh2;
+        final int bufLength;
         
-        private Packet(byte[] buf, int trailingGapLength, byte min, byte max) {
-            this.buf = buf;
+        private Packet(byte[] buf1, byte[] buf2, int bufLength, int trailingGapLength, 
+                byte min, byte max, byte minCh1, byte maxCh1, byte minCh2, byte maxCh2) {
+            this.buf1 = buf1;
+            this.buf2 = buf2;
             this.trailingGapLength = trailingGapLength;
             this.min = min;
             this.max = max;
+            this.bufLength = bufLength;
+            this.minCh1 = minCh1;
+            this.maxCh1 = maxCh1;
+            this.minCh2 = minCh2;
+            this.maxCh2 = maxCh2;
         }
     }
     
-    static class DataIterator {
+    class DataIterator {
         Packet packet;
         int index;
         int sample;
+        int packetSample;
         
         DataIterator() {
         }
@@ -81,17 +97,19 @@ public class Data {
          */
         boolean init(int startSample) {
             if (startSample > totalNumSamples)
-                throw new IndexOutOfBoundsException();
+                throw new IndexOutOfBoundsException(""+startSample+" > "+totalNumSamples);
             index = 0;
+            packetSample = 0;
             packet = null;
             while (index < data.size()) {
                 packet = data.get(index);
-                int packetLength = packet.buf.length + packet.trailingGapLength;
+                int packetLength = packet.bufLength + packet.trailingGapLength;
                 if (startSample < packetLength) {
                     sample = startSample;
                     break;
                 }
                 startSample -= packetLength;
+                packetSample += packetLength;
                 if (++index == data.size()) {
                     if (startSample == 0)
                         return false;
@@ -103,25 +121,31 @@ public class Data {
         }
         
         boolean atLostData() {
-            return sample >= packet.buf.length;
+            return sample >= packet.bufLength;
         }
         
         int getRemainingDataLength() {
-            return packet.buf.length - sample;
+            return packet.bufLength - sample;
         }
         
         int getRemainingLostLength() {
-            return packet.buf.length + packet.trailingGapLength - sample;
+            return packet.bufLength + packet.trailingGapLength - sample;
         }
         
         int getLostDataLength() {
             return packet.trailingGapLength;
         }
         
-        byte[] getData() {
+        byte[] getData2() {
             if (atLostData())
                 throw new IllegalStateException();
-            return packet.buf;
+            return packet.buf2;
+        }
+        
+        byte[] getData1() {
+            if (atLostData())
+                throw new IllegalStateException();
+            return packet.buf1;
         }
         
         int getDataStart() {
@@ -132,13 +156,22 @@ public class Data {
         
         boolean hasMoreData() {
             synchronized (data) {
-                return packet != null && (index < data.size() || sample < packet.buf.length + packet.trailingGapLength);
+                if (packet == null && index < data.size())
+                    packet = data.get(index);
+                return packet != null && (index < data.size() || sample < packet.bufLength + packet.trailingGapLength);
+            }
+        }
+        
+        boolean hasNextPacket() {
+            synchronized (data) {
+                return index < data.size() - 1;
             }
         }
         
         private void loadNextPacket() {
             synchronized (data) {
-                packet = index < data.size()-1 ? data.get(++index) : null;
+                packetSample += packet.bufLength + packet.trailingGapLength;
+                packet = ++index < data.size() ? data.get(index) : null;
                 sample = 0;
             }
         }
@@ -151,19 +184,35 @@ public class Data {
             return packet.max;
         }
         
+        int getPacketMinCh1() {
+            return packet.minCh1 & 0xff;
+        }
+        
+        int getPacketMaxCh1() {
+            return packet.maxCh1 & 0xff;
+        }
+        
+        int getPacketMinCh2() {
+            return packet.minCh2 & 0xff;
+        }
+        
+        int getPacketMaxCh2() {
+            return packet.maxCh2 & 0xff;
+        }
+        
         void skip(int samples) {
             sample += samples;
-            if (sample >= packet.buf.length + packet.trailingGapLength) {
-                if (sample > packet.buf.length + packet.trailingGapLength)
+            if (sample >= packet.bufLength + packet.trailingGapLength) {
+                if (sample > packet.bufLength + packet.trailingGapLength)
                     throw new UnsupportedOperationException();
                 loadNextPacket();
             }
         }
         
         void skipData() {
-            if (sample <= packet.buf.length) {
+            if (sample <= packet.bufLength) {
                 if (packet.trailingGapLength > 0)
-                    sample = packet.buf.length;
+                    sample = packet.bufLength;
                 else 
                     loadNextPacket();
             } else
@@ -171,18 +220,34 @@ public class Data {
         }
         
         void skipLostData() {
-            if (sample < packet.buf.length || packet.trailingGapLength == 0)
+            if (sample < packet.bufLength || packet.trailingGapLength == 0)
                 throw new IllegalStateException();
             loadNextPacket();
         }
+
+        void skipToNextPacket() {
+            loadNextPacket();
+        }
+        
+        int getCurrentSample() {
+            return packetSample + sample;
+        }
+        
+        void backInTime(int sample) {
+            if (sample < packetSample)
+                throw new IllegalArgumentException("Not allowed to get back to different packet");
+            this.sample = sample - packetSample;
+        }
     }
 
-    static void startAcquisition(LogicAnalyzer.Frequency frequency) {
+    void startAcquisition(DDS140.Frequency frequency, boolean isLogicAnalyzerMode, boolean trim) {
         clear();
-        Data.frequency = frequency;
+        this.trim = trim;
+        this.frequency = frequency;
+        this.isLogicAnalyzerMode = isLogicAnalyzerMode;
     }
     
-    static void stopAcquisition(boolean trim) {
+    void stopAcquisition() {
         if (trim) {
             for (int i = data.size(); --i >= 1; ) {
                 Packet p = data.get(i);
@@ -191,39 +256,55 @@ public class Data {
                         data.remove(i);
                     else
                         break;
-                    totalNumSamples -= p.buf.length + p.trailingGapLength;
-                    totalNumDataSamples -= p.buf.length;
+                    totalNumSamples -= p.bufLength + p.trailingGapLength;
+                    totalNumDataSamples -= p.bufLength;
                 }
-                Main.controller.updateWaves(totalNumSamples, totalNumSamples);
             }
+            Main.controller.updateWaves(totalNumSamples, totalNumSamples);
         }
-        if (data.size() == 0)
+        if (data.isEmpty())
             Main.error("No data captured (or all data trimmed)", false);
     }
     
-    private static void clear() {
+    void clear() {
         totalNumSamples = 0;
         totalNumDataSamples = 0;
         lead = true;
         data.clear();
     }
     
-    static void processData(LogicAnalyzer.Packet packet) {
+    void processData(DDS140.Packet packet) {
         ByteBuffer buf = packet.getBuffer();
         final int packetTrailingGap = packet.getTrailingGapLength();
-        byte[] d = new byte[LogicAnalyzer.SAMPLES_PER_BUFFER];
+        byte[] d1 = isLogicAnalyzerMode ? null : new byte[DDS140.SAMPLES_PER_BUFFER];
+        byte[] d2 = new byte[DDS140.SAMPLES_PER_BUFFER];
         byte min = (byte)0xff;
         byte max = 0;
-        for (int i = LogicAnalyzer.SAMPLES_PER_BUFFER; --i >= 0; ) {
-            byte val = buf.get((i<<1)+1);
-            min &= val;
-            max |= val;
-            d[i] = val;
+        byte minCh1 = (byte)0xff;
+        byte maxCh1 = 0;
+        byte minCh2 = (byte)0xff;
+        byte maxCh2 = 0;
+        for (int i = DDS140.SAMPLES_PER_BUFFER; --i >= 0; ) {
+            byte val1 = buf.get(i<<1);
+            byte val2 = buf.get((i<<1)+1);
+            min &= val2;
+            max |= val2;
+            if (val1 < minCh1)
+                minCh1 = val1;
+            if (val1 > maxCh1)
+                maxCh1 = val1;
+            if (val2 < minCh2)
+                minCh2 = val2;
+            if (val2 > maxCh2)
+                maxCh2 = val2;
+            if (!isLogicAnalyzerMode)
+                d1[i] = val1;
+            d2[i] = val2;
         }
-        Main.la.releaseDataBuffer(packet);
-        if (!lead || !Main.trim || min != max) {
+        Main.device.releaseDataBuffer(packet);
+        if (!lead || !trim || min != max) {
             synchronized (data) {
-                data.add(new Packet(d, packetTrailingGap, min, max));
+                data.add(new Packet(d1, d2, d2.length, packetTrailingGap, min, max, minCh1, maxCh1, minCh2, maxCh2));
                 totalNumSamples += buf.capacity() / 2 + packetTrailingGap;
                 totalNumDataSamples += buf.capacity() / 2;
             }
@@ -232,46 +313,58 @@ public class Data {
         }
     }
     
-    static void load(File file) throws IOException {
+    static Data load(File file) throws IOException {
+        Data instance = new Data();
         Properties props = new Properties();
         try (InputStream in = new FileInputStream(file)) {
             props.load(in);
         }
-        clear();
+        instance.clear();
         try {
-            totalNumDataSamples = Integer.parseInt(props.getProperty("totalNumDataSamples"));
-            totalNumSamples = Integer.parseInt(props.getProperty("totalNumSamples"));
-            frequency = LogicAnalyzer.Frequency.valueOf(props.getProperty("frequency"));
+            instance.totalNumDataSamples = Integer.parseInt(props.getProperty("totalNumDataSamples"));
+            instance.totalNumSamples = Integer.parseInt(props.getProperty("totalNumSamples"));
+            instance.frequency = DDS140.Frequency.valueOf(props.getProperty("frequency"));
+            instance.isLogicAnalyzerMode = !Boolean.parseBoolean(props.getProperty("isOscilloscope"));
             final int numPackets = Integer.parseInt(props.getProperty("numPackets"));
             for (int i = 0; i < numPackets; i++) {
                 final int len = Integer.parseInt(props.getProperty("packet-"+i+"-length"));
-                final byte[] buf = new byte[len];
-                final String d = props.getProperty("packet-"+i+"-data");
-                if (d.length() != len*3-1)
-                    throw new IOException("Corrupt data file");
-                for (int k = 0; k < len; k++) {
-                    if (k < len-1 && d.charAt(k*3+2) != ',')
-                        throw new IOException("Corrupt data file");
-                    buf[k] = (byte) Integer.parseInt(d.substring(k*3, k*3+2), 16);
-                }
-                data.add(new Packet(
-                        buf,
+                instance.data.add(instance.new Packet(
+                        (byte[])(instance.isLogicAnalyzerMode ? null : loadBuffer(props, i, len, "1")),
+                        loadBuffer(props, i, len, instance.isLogicAnalyzerMode ? "" : "2"),
+                        len,
                         Integer.parseInt(props.getProperty("packet-"+i+"-gap")),
                         (byte)Integer.parseInt(props.getProperty("packet-"+i+"-min"), 16),
-                        (byte)Integer.parseInt(props.getProperty("packet-"+i+"-max"), 16)
+                        (byte)Integer.parseInt(props.getProperty("packet-"+i+"-max"), 16),
+                        (byte)Integer.parseInt(props.getProperty("packet-"+i+"-minCh1", "80"), 16),
+                        (byte)Integer.parseInt(props.getProperty("packet-"+i+"-maxCh1", "80"), 16),
+                        (byte)Integer.parseInt(props.getProperty("packet-"+i+"-minCh2", "80"), 16),
+                        (byte)Integer.parseInt(props.getProperty("packet-"+i+"-maxCh2", "80"), 16)
                 ));
             }
-            lead = false;
-            Platform.runLater(() -> Main.controller.dataLoaded(totalNumSamples));
+            instance.lead = false;
         }
         catch (IllegalArgumentException | NullPointerException | OutOfMemoryError ex) {
-            clear();
+            instance.clear();
             throw new IOException("Corrupt data file", ex);
         }
+        return instance;
+    }
+
+    private static byte[] loadBuffer(Properties props, int packetIndex, int packetLength, String suffix) throws IOException {
+        final byte[] buf = new byte[packetLength];
+        final String d = props.getProperty("packet-"+packetIndex+"-data"+suffix);
+        if (d.length() != packetLength*3-1)
+            throw new IOException("Corrupt data file");
+        for (int k = 0; k < packetLength; k++) {
+            if (k < packetLength-1 && d.charAt(k*3+2) != ',')
+                throw new IOException("Corrupt data file");
+            buf[k] = (byte) Integer.parseInt(d.substring(k*3, k*3+2), 16);
+        }
+        return buf;
     }
     
-    static void save(File file) throws IOException {
-        if (data.size() == 0) {
+    void save(File file) throws IOException {
+        if (data.isEmpty()) {
             Main.error("No data to save. Please capture some", false);
             return;
         }
@@ -288,18 +381,47 @@ public class Data {
     }
 
     private static void serializePacket(int i, Packet p, Properties props) {
-        final int len = p.buf.length;
+        final int len = p.bufLength;
         props.setProperty("packet-"+i+"-length", Integer.toString(len));
-        StringBuilder str = new StringBuilder(len*3);
-        for (byte b: p.buf)
-            str.append(String.format("%02x", b&0xff)).append(',');
-        props.setProperty("packet-"+i+"-data", str.substring(0, str.length()-1));
+        if (p.buf1 != null)
+            serializeBuffer(props, p, p.buf1, i, len);
+        serializeBuffer(props, p, p.buf2, i, len);
         props.setProperty("packet-"+i+"-gap", Integer.toString(p.trailingGapLength));
         props.setProperty("packet-"+i+"-min", Integer.toHexString(p.min&0xff));
         props.setProperty("packet-"+i+"-max", Integer.toHexString(p.max&0xff));
+        props.setProperty("packet-"+i+"-minCh1", Integer.toHexString(p.minCh1&0xff));
+        props.setProperty("packet-"+i+"-maxCh1", Integer.toHexString(p.maxCh1&0xff));
+        props.setProperty("packet-"+i+"-minCh2", Integer.toHexString(p.minCh2&0xff));
+        props.setProperty("packet-"+i+"-maxCh2", Integer.toHexString(p.maxCh2&0xff));
+    }
+    
+    private static void serializeBuffer(Properties props, Packet p, byte[] buf, int index, int len) {
+        StringBuilder str = new StringBuilder(len*3);
+        for (byte b: buf)
+            str.append(String.format("%02x", b&0xff)).append(',');
+        props.setProperty("packet-"+index+"-data", str.substring(0, str.length()-1));
     }
 
-    static LogicAnalyzer.Frequency getFrequency() {
+    DDS140.Frequency getFrequency() {
         return frequency;
+    }
+
+    String sampleToTime(int pos, int unitsId) {
+        if (frequency == null)
+            return "";
+        if (unitsId > 0) {
+            double time = pos * Math.pow(1000, 4-unitsId) / frequency.getFrequency();
+            return String.format("%.2f", time);
+        } else
+            return String.valueOf(pos);
+    }
+
+    double timeToSamples(double value, int unitsId) {
+        if (frequency == null)
+            return 0.;
+        if (unitsId > 0)
+            return value * frequency.getFrequency() / Math.pow(1000, 4-unitsId);
+        else
+            return value;
     }
 }

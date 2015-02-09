@@ -30,7 +30,7 @@ import java.nio.ByteBuffer;
 
 /**
  *
- * @author Dragon
+ * @author Andrey Petushkov
  */
 public class UsbDevice {
     private long msbits;
