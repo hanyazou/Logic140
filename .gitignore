@@ -4,3 +4,5 @@
 /Logic140_winusb/x64/
 /Logic140_winusb/Logic140_winusb/x64/
 /Logic140_winusb/Logic140_winusb Package/x64/
+/Logic140_libusb/build/
+*.class

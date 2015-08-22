@@ -23,12 +23,17 @@
 * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 * POSSIBILITY OF SUCH DAMAGE.
 */
-#include "pch.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
 #include "libUsb_UsbDevice.h"
 
-#include <stdio.h>
+#define ULONG unsigned long
+#define UCHAR unsigned char
+#define Sleep(a) usleep((a)*1000)
 
-#define EMULATION 0
+#define EMULATION 1
 
 /*
 * Class:     libUsb_UsbDevice
@@ -155,7 +160,7 @@ JNIEXPORT jbyte JNICALL Java_libUsb_UsbDevice_controlRequest0
 	(void)env;
 	(void)value;
 	(void)descriptor;
-	return request == 0x22 || request == 0x23 ? 0x00 : request == 0x50 ? 0x21 : request;
+	return request == 0x22 || request == 0x23 ? value : request == 0x50 ? 0x21 : request;
 #endif
 }
 
@@ -189,7 +194,7 @@ JNIEXPORT jint JNICALL Java_libUsb_UsbDevice_fillBuffer0
 	(void)descriptor;
 	num++;
 	for (int i = (ULONG)env->GetDirectBufferCapacity(buf); --i >= 0; )
-		p[i] = num != 3 && num != 5 ? 1 : (UCHAR)(0x155 >> (((i + ((i & 1)*10)) >> 8) & 1));
+		p[i] = (UCHAR)(0x155 >> (((i + ((i & 1)*10)) >> 8) & 1));
 	Sleep(100);
 	return (jint)env->GetDirectBufferCapacity(buf);
 #endif
