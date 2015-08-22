@@ -27,13 +27,25 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <libusb.h>
 #include "libUsb_UsbDevice.h"
 
+#define ARRAYSIZEOF(a) (sizeof(a)/sizeof(*(a)))
 #define ULONG unsigned long
 #define UCHAR unsigned char
 #define Sleep(a) usleep((a)*1000)
 
-#define EMULATION 1
+#define EMULATION 0
+//#define DEBUG
+
+#define USB_PRODUCT_ID 0x8312
+#define USB_VENDOR_ID  0x8312
+#define USB_CONTROL_REQUEST_TYPE_IN 0x80
+
+struct ctx {
+	libusb_context *usbctx;
+	libusb_device_handle* devhdl;
+};
 
 /*
 * Class:     libUsb_UsbDevice
@@ -43,71 +55,66 @@
 JNIEXPORT jbyteArray JNICALL Java_libUsb_UsbDevice_open0
 (JNIEnv *env, jobject obj, jlong msbits, jlong lsbits) {
 #if !EMULATION
-	DEVICE_DATA           deviceData;
-	HRESULT               hr;
-	USB_DEVICE_DESCRIPTOR deviceDesc;
-	BOOL                  bResult;
-	BOOL                  noDevice;
-	ULONG                 lengthReceived;
+	libusb_context *usbctx;
+	libusb_device_handle* devhdl;
+	int res;
 
 	(void)obj;
 
-	//
-	// Find a device connected to the system that has WinUSB installed using our
-	// INF
-	//
-	hr = OpenDevice(msbits, lsbits, &deviceData, &noDevice);
+	/*
+	 * initialize
+	 */
+	res = libusb_init(&usbctx);
+	if (res != 0)
+		env->ThrowNew(env->FindClass("java/io/IOException"), "Can't initialize libusb.");
+	libusb_set_debug(usbctx, 3); 
 
-	if (FAILED(hr)) {
-		const char *msg;
-		jclass clazz;
-		if (noDevice) {
-			msg = "Device not connected or driver not installed\n";
-			clazz = env->FindClass("java/io/FileNotFoundException");
+#ifdef DEBUG
+	/*
+	 * enumeration (not needed, just information)
+	 */
+	ssize_t ndevs;
+	libusb_device **list;
+	struct libusb_device_descriptor desc;
+	ndevs = libusb_get_device_list(usbctx, &list);
+	printf("%d usb device%s found,\n", (int)ndevs, 1 < ndevs ? "s" : "");
+	for (int i = 0; i < ndevs; i++) {
+		libusb_get_device_descriptor(list[i], &desc);
+		printf("%2d: %04x:%04x\n", i, desc.idVendor, desc.idProduct);
+		if (desc.idVendor == USB_VENDOR_ID && desc.idProduct == USB_PRODUCT_ID) {
+			struct libusb_config_descriptor* config;
+			libusb_get_active_config_descriptor(list[i], &config);
+			for (int i = 0; i < config->interface->num_altsetting; i++) {
+				const struct libusb_interface_descriptor* iface = &config->interface->altsetting[i];
+				printf("  bNumEndpoints=%d\n", iface->bNumEndpoints);
+				for (int i = 0; i < iface->bNumEndpoints; i++) {
+					const struct libusb_endpoint_descriptor* epd = &iface->endpoint[i];
+					printf("    [%d]bEndpointAddess=0x%02x\n", i, epd->bEndpointAddress);
+				}
+			}
+			libusb_free_config_descriptor(config);
 		}
-		else {
-			printf(_T("Failed looking for device, HRESULT 0x%x\n"), hr);
-			msg = "Failed looking for device";
-			clazz = env->FindClass("java/io/IOException");
-		}
-
-		env->ThrowNew(clazz, msg);
-		return 0;
 	}
+	libusb_free_device_list(list, 1 /* unref devices in the list */);
+#endif // DEBUG
 
-	//
-	// Get device descriptor
-	//
-	bResult = WinUsb_GetDescriptor(deviceData.WinusbHandle,
-		USB_DEVICE_DESCRIPTOR_TYPE,
-		0,
-		0,
-		(PBYTE)&deviceDesc,
-		sizeof(deviceDesc),
-		&lengthReceived);
+	/*
+	 * open device
+	 */
+	devhdl = libusb_open_device_with_vid_pid(usbctx, USB_VENDOR_ID, USB_PRODUCT_ID);
+	if (devhdl == NULL)
+		env->ThrowNew(env->FindClass("java/io/IOException"), "Can't open the USB device.");
+	res = libusb_claim_interface(devhdl, 0);
+	if (res < 0)
+		env->ThrowNew(env->FindClass("java/io/IOException"), "Can't claim interface 0.");
 
-	if (FALSE == bResult || lengthReceived != sizeof(deviceDesc)) {
+	struct ctx ctx;
+	ctx.usbctx = usbctx;
+	ctx.devhdl = devhdl;
+	jbyteArray ar = env->NewByteArray(sizeof(ctx));
+	env->SetByteArrayRegion(ar, 0, sizeof(ctx), (jbyte*)&ctx);
 
-		printf(_T("Error among LastError %d or lengthReceived %d\n"),
-			FALSE == bResult ? GetLastError() : 0,
-			lengthReceived);
-		env->ThrowNew(env->FindClass("java/io/IOException"), "Cannot get USB device descriptor");
-		CloseDevice(&deviceData);
-		return 0;
-	}
-
-	//
-	// Print a few parts of the device descriptor
-	//
-	printf(_T("Device found: VID_%04X&PID_%04X; bcdUsb %04X\n"),
-		deviceDesc.idVendor,
-		deviceDesc.idProduct,
-		deviceDesc.bcdUSB);
-
-	jbyteArray res = env->NewByteArray(sizeof(deviceData));
-	env->SetByteArrayRegion(res, 0, sizeof(deviceData), (jbyte*)&deviceData);
-
-	return res;
+	return ar;
 #else
 	(void)env;
 	(void)obj;
@@ -125,11 +132,13 @@ JNIEXPORT jbyteArray JNICALL Java_libUsb_UsbDevice_open0
 JNIEXPORT void JNICALL Java_libUsb_UsbDevice_close0
 (JNIEnv *env, jobject obj, jbyteArray descriptor) {
 #if !EMULATION
-	DEVICE_DATA           deviceData;
+	struct ctx ctx;
+
 	(void)obj;
 	if (descriptor != 0) {
-		env->GetByteArrayRegion(descriptor, 0, sizeof(deviceData), (jbyte*)&deviceData);
-		CloseDevice(&deviceData);
+		env->GetByteArrayRegion(descriptor, 0, sizeof(ctx), (jbyte*)&ctx);
+		libusb_close(ctx.devhdl);
+		libusb_exit(ctx.usbctx);
 	}
 #else
 	(void)env;
@@ -147,19 +156,34 @@ JNIEXPORT jbyte JNICALL Java_libUsb_UsbDevice_controlRequest0
 (JNIEnv *env, jobject obj, jbyteArray descriptor, jbyte request, jbyte value) {
 	(void)obj;
 #if !EMULATION
-	DEVICE_DATA           deviceData;
-	WINUSB_SETUP_PACKET setup = { 0x80 /* in, std, whole device */, request, value, 0, 1 };
-	jbyte res;
-	ULONG resLength;
-	env->GetByteArrayRegion(descriptor, 0, sizeof(deviceData), (jbyte*)&deviceData);
-	if (WinUsb_ControlTransfer(deviceData.WinusbHandle, setup, (UCHAR*)&res, 1, &resLength, NULL))
-		return res;
-	env->ThrowNew(env->FindClass("java/io/IOException"), "control transfer function failed");
-	return 0;
+	struct ctx ctx;
+	int res;
+	unsigned char data_in;
+
+	env->GetByteArrayRegion(descriptor, 0, sizeof(ctx), (jbyte*)&ctx);
+
+	res = libusb_control_transfer(ctx.devhdl,
+				USB_CONTROL_REQUEST_TYPE_IN,
+				request,
+				value,
+				0,		// the index field for the setup packet
+				&data_in,
+				1,		// the length field for the setup packet. The data buffer should be at least this size.
+				0);		// TIMEOUT_MS
+#ifdef DEBUG
+	printf("libusb_control_transfer(%02x, %02x): len=%d, res=%02x\n", request & 0xff, value & 0xff, res, data_in & 0xff);
+#endif // DEBUG
+	if (res != 1)
+		env->ThrowNew(env->FindClass("java/io/IOException"), "control transfer function failed");
+
+	return (jbyte)(data_in & 0xff);
 #else
 	(void)env;
 	(void)value;
 	(void)descriptor;
+#ifdef DEBUG
+	printf("libusb_control_transfer(%02x, %02x)=%d, data_in=%02x\n", request & 0xff, value & 0xff, 1, (request == 0x22 || request == 0x23 ? value : request == 0x50 ? 0x21 : request) & 0xff);
+#endif // DEBUG
 	return request == 0x22 || request == 0x23 ? value : request == 0x50 ? 0x21 : request;
 #endif
 }
@@ -175,8 +199,9 @@ static char num = 0;
 JNIEXPORT jint JNICALL Java_libUsb_UsbDevice_fillBuffer0
 (JNIEnv *env, jobject obj, jbyteArray descriptor, jobject buf) {
 #if !EMULATION
-	DEVICE_DATA           deviceData;
-	ULONG resLength;
+	struct ctx ctx;
+	int res;
+	int transferred;
 #endif
 	UCHAR *p;
 	(void)obj;
@@ -184,12 +209,19 @@ JNIEXPORT jint JNICALL Java_libUsb_UsbDevice_fillBuffer0
 	if (p == NULL)
 		env->ThrowNew(env->FindClass("java/io/IOException"), "cannot get buffer address or not a direct buffer");
 #if !EMULATION
-	env->GetByteArrayRegion(descriptor, 0, sizeof(deviceData), (jbyte*)&deviceData);
-	if (WinUsb_ReadPipe(deviceData.WinusbHandle, 0x82, p, (ULONG)env->GetDirectBufferCapacity(buf), &resLength, NULL))
-		return (jlong)resLength;
-	printf(_T("LastError %d\n"), GetLastError());
-	env->ThrowNew(env->FindClass("java/io/IOException"), "read function failed");
-	return 0;
+	env->GetByteArrayRegion(descriptor, 0, sizeof(ctx), (jbyte*)&ctx);
+	res = libusb_bulk_transfer(ctx.devhdl,
+				0x2 | LIBUSB_ENDPOINT_IN,	// end point address
+				p,
+				(ULONG)env->GetDirectBufferCapacity(buf),
+				&transferred,
+				0);							// timeout (unlimited)
+#ifdef DEBUG
+	printf("libusb_bulk_transfer(length=%d): res=%d, transferred=%d\n", (int)env->GetDirectBufferCapacity(buf), res, transferred);
+#endif // DEBUG
+	if (res != 0)
+		env->ThrowNew(env->FindClass("java/io/IOException"), "read function failed");
+	return (jint)transferred;
 #else
 	(void)descriptor;
 	num++;
